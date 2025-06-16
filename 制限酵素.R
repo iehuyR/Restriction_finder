@@ -2,6 +2,18 @@ setwd("~/20250610_newtarget")
 
 library(Biostrings)
 
+# 1. IUPAC展開関数（GTMKAC → GTAAAC, GTACTCなど）
+expand_iupac <- function(pattern) {
+  chars <- strsplit(pattern, "")[[1]]
+  options <- lapply(chars, function(ch) {
+    bases <- Biostrings::IUPAC_CODE_MAP[[ch]]
+    strsplit(bases, "")[[1]]
+  })
+  expand.grid(options, stringsAsFactors = FALSE) |>
+    apply(1, paste0, collapse = "")
+}
+
+# 2. 制限酵素認識配列
 restriction_enzymes <- list(
   AccI    = "GTMKAC",
   AflII   = "CTTAAG",
@@ -75,21 +87,31 @@ restriction_enzymes <- list(
   BanI    = "GGYRCC"
 )
 
+# 3. FASTA読み込み＋結合
 fasta_file <- "matched_sequences_renamed.fasta"
 seqs <- readDNAStringSet(fasta_file)
 combined_seq <- paste(as.character(seqs), collapse = "")
 combined_seq <- DNAString(combined_seq)
 
+# 4. 検出処理
 non_cutting <- c()
+cat("🔬 スキャン中...\n")
 
 for (enzyme in names(restriction_enzymes)) {
   pattern <- restriction_enzymes[[enzyme]]
-  matches <- matchPattern(pattern, combined_seq)  # 修正済み
-  if (length(matches) == 0) {
+  expanded <- expand_iupac(pattern)
+  found <- FALSE
+  for (p in expanded) {
+    if (length(matchPattern(p, combined_seq)) > 0) {
+      found <- TRUE
+      break
+    }
+  }
+  if (!found) {
     non_cutting <- c(non_cutting, enzyme)
   }
 }
 
+# 5. 結果出力
 cat("🧬 認識サイトが1箇所もない制限酵素:\n")
 print(non_cutting)
-
